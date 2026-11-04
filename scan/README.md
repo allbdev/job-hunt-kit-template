@@ -17,6 +17,14 @@ Finds remote jobs that fit you, every day, and shows them on one page.
 - macOS.
 - Python 3 (standard library only).
 - Claude Code, with the Claude in Chrome extension connected. Only the Google step needs it.
+  Run it in a **dedicated Chrome profile that is signed out** of Google and every other site:
+  1. Chrome > Profiles > Add, choose "Continue without an account". Name it "Job scan".
+  2. Install the Claude in Chrome extension in that profile only. Remove it from your main
+     profile, so Claude can only ever drive the empty one.
+  3. Never sign in to anything in that profile.
+
+  `harvest-google.js` refuses to run on a signed-in Google page, and the daily agent runs with a
+  fixed tool allowlist (`--permission-mode dontAsk`), never with permission checks turned off.
 - Optional: `gh` CLI, logged in, for board discovery.
 
 ## Set up

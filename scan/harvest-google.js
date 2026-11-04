@@ -38,6 +38,17 @@ const JOB_RX = [
   /https?:\/\/jobs\.ashbyhq\.com\/[A-Za-z0-9._-]{2,40}\/[0-9a-f-]{16,40}/g,
 ];
 
+// The scan must run in a Chrome profile that is signed out of Google (and of
+// everything else). A signed-in page means the wrong profile is connected.
+// Fail closed: a page with no visible "Sign in" link counts as signed in.
+const signedIn = () =>
+  !!document.querySelector('a[href*="accounts.google.com/SignOutOptions"]')
+  || !document.querySelector('a[href*="accounts.google.com/ServiceLogin"], a[href*="accounts.google.com/v3/signin"], a[href*="accounts.google.com/signin"]');
+
+if (!location.href.includes('/sorry/') && signedIn()) {
+  throw new Error('SIGNED_IN: this Chrome profile is signed in to Google. Stop the scan and use a signed-out profile.');
+}
+
 window._jobs = window._jobs || new Set();
 
 // One search URL per host and query. Only the first page of each is built by hand; every page
@@ -58,6 +69,7 @@ window._page = () => {
   const blocked = location.href.includes('/sorry/')
     || /Our systems have detected unusual traffic/i.test(document.body.innerText);
   if (blocked) return { blocked: true, jobs: [], next: null, total: window._jobs.size };
+  if (signedIn()) return { signedIn: true, jobs: [], next: null, total: window._jobs.size };
 
   const htmlText = document.documentElement.outerHTML;
   const found = new Set();

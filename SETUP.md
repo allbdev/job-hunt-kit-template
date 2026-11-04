@@ -91,7 +91,8 @@ Write the interview into, in this order:
   `me/.venv/bin/python scan/report.py`, and open `me/scan/report.html`.
 - Ask before installing the daily schedule: `scan/install-launchd.sh --load`.
 - The Google step needs Claude Code with the Chrome extension connected. Skip it if they don't
-  use Chrome.
+  use Chrome. It must run in a separate, signed-out Chrome profile with the extension installed
+  there only: walk them through the steps in `scan/README.md` before the first run.
 
 ## 6. Done
 

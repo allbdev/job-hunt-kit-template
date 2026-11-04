@@ -38,18 +38,44 @@ cd "$SCAN_DIR" || exit 1
 # gives every board a weekly refresh, and a Google block costs the Google half only.
 "$PY" scan.py --slice >>"$STATE/board-slice.log" 2>>"$STATE/board-slice.err.log"
 
-AUTOMATION_PROMPT="Run the unattended daily job scan. Read and follow $SCAN_DIR/DAILY-AUTOMATION.md exactly. Use the connected Chrome session for Google and do all harvesting, validation, Python processing, and report verification yourself. Board discovery and the board rotation have already run, so do not run discover.py or scan.py. The wrapper opens the report after you exit, so do not open it. Finish with a concise summary of new viable jobs or state that there were none."
+# Today's harvest file, dated in TIMEZONE from me/search.py (local date if unset).
+# The wrapper names it so the agent never needs a shell to work out the date.
+TODAY=$("$PY" -c "
+import sys, datetime; sys.path.insert(0, '$SCAN_DIR'); import config
+try:
+    from zoneinfo import ZoneInfo; tz = ZoneInfo(config.TIMEZONE) if config.TIMEZONE else None
+except Exception:
+    tz = None
+print(datetime.datetime.now(tz).date().isoformat())") || exit 1
+HARVEST="$STATE/harvest-$TODAY.json"
+
+AUTOMATION_PROMPT="Run the unattended daily job scan. Read and follow $SCAN_DIR/DAILY-AUTOMATION.md exactly. Today's harvest file is $HARVEST. Use the connected Chrome session for Google and do all harvesting, validation, Python processing, and report verification yourself. Board discovery and the board rotation have already run, so do not run discover.py or scan.py. The wrapper opens the report after you exit, so do not open it. Finish with a concise summary of new viable jobs or state that there were none."
+
+# No permission bypass. dontAsk denies every tool call that is not on this
+# list, so text planted in a web page cannot get the agent to run anything else.
+# Allowed: the Chrome tools, the exact scan commands from DAILY-AUTOMATION.md,
+# and writing today's harvest file. Reading files inside the repo needs no rule.
+ALLOWED_TOOLS=(
+  "mcp__claude-in-chrome"
+  "Bash(python3 scan/queries.py)"
+  "Bash(python3 scan/runlog.py google *)"
+  "Bash(python3 scan/google_scan.py $HARVEST)"
+  "Bash(python3 scan/report.py)"
+  "Edit(/$HARVEST)"
+)
 
 if [ -z "$CLAUDE_BIN" ]; then
   echo "claude not found on PATH, skipping the Google step" >&2
   STATUS=1
 else
-  /usr/bin/caffeinate -i "$CLAUDE_BIN" \
+  # Run from the repo root: DAILY-AUTOMATION.md paths are relative to it.
+  (cd "$REPO" && /usr/bin/caffeinate -i "$CLAUDE_BIN" \
     --print \
     --chrome \
     --no-session-persistence \
-    --dangerously-skip-permissions \
-    "$AUTOMATION_PROMPT"
+    --permission-mode dontAsk \
+    --allowedTools "${ALLOWED_TOOLS[@]}" \
+    -- "$AUTOMATION_PROMPT")
   STATUS=$?
 fi
 
