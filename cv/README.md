@@ -14,7 +14,7 @@ PDFs land in `me/cvs/`.
 
 | Change | File |
 |---|---|
-| Name, contact, education, speaking, jobs, dates, older job bullets, tools row, banned tools | `me/profile.py` |
+| Name, contact, education, speaking, jobs, dates, older job bullets, projects, tools row, banned tools | `me/profile.py` |
 | Role line, tagline, summary, skills, current job bullets | one `me/cv-data/*.py` |
 | Layout, fonts, colours | `cv/cvlib.py` |
 

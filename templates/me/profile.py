@@ -23,6 +23,10 @@ BANNED = []
 # Hex color for the CV's accent: role line, section headers, the rule under the name.
 ACCENT = "#00695C"
 
+# Optional. Personal projects, one line each, printed under EXPERIENCE.
+#   "<b>Name</b> &middot; link &middot; what it is, what you did, stack."
+PROJECTS = []
+
 # Newest first. The first job is tailored per focus CV (CURRENT in cv-data/*.py).
 # One dict per employer:
 #   {"key": "employer-key", "title": "Your Title", "company": "Employer &middot; Location, type",

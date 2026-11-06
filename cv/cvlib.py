@@ -36,6 +36,8 @@ SPEAKING = getattr(P, "SPEAKING", "")
 TOOLS = P.TOOLS
 JOBS = P.JOBS
 BANNED = getattr(P, "BANNED", [])
+# Optional. One line each: "<b>Name</b> &middot; what it is &middot; link".
+PROJECTS = getattr(P, "PROJECTS", [])
 OUT_DIR = os.path.join(ME, "cvs")
 
 ACCENT_HEX = getattr(P, "ACCENT", "#00695C")
@@ -116,6 +118,13 @@ def skills(pairs):
 
 def summary(text):
     return [Paragraph(text, S["body"])]
+
+
+def projects(items=None):
+    items = PROJECTS if items is None else items
+    if not items:
+        return []
+    return sec("PROJECTS") + [Paragraph(t, S["bullet"], bulletText="\u2022") for t in items]
 
 
 def speaking():
