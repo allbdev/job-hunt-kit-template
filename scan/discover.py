@@ -15,6 +15,7 @@ Two sources, because no free engine allows unattended site: querying:
 """
 import argparse, datetime, json, os, pathlib, re, shutil, subprocess, sys, time
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 
 import config
 import runlog
@@ -31,6 +32,16 @@ PER_PAGE = 100
 # The GitHub code-search endpoint is limited to 10 requests per minute.
 GITHUB_CALL_INTERVAL = 10
 _last_github_call = None
+# A dropped page is retried before the search counts as failed. One read
+# timeout used to fail the whole step and send a "did not finish" alert.
+GITHUB_RETRIES = 2
+GITHUB_RETRY_WAIT = 30
+# Slugs whose board was dead or empty. The same few hundred come back from
+# GitHub every day, and re-checking each one took most of an hour. A board
+# that opens postings later gets checked again after DEAD_DAYS.
+DEAD = HERE / "discover-dead.json"
+DEAD_DAYS = int(os.environ.get("DISCOVER_DEAD_DAYS", 7))
+LIVE_CHECK_WORKERS = 6
 
 # source -> (host to search for, slug regex, board API to confirm the slug)
 BOARDS = {
@@ -85,12 +96,22 @@ def gh_search(host, page):
         return None
 
 
+def gh_search_retrying(host, page):
+    for attempt in range(GITHUB_RETRIES + 1):
+        d = gh_search(host, page)
+        if d is not None or attempt == GITHUB_RETRIES:
+            return d
+        wait = GITHUB_RETRY_WAIT * (attempt + 1)
+        print(f"  retrying page {page} in {wait}s", file=sys.stderr)
+        time.sleep(wait)
+
+
 def harvest(host, slug_rx):
     """(slugs, success) from GitHub code search for one board host."""
     slugs = set()
     complete = True
     for page in range(1, PAGES + 1):
-        d = gh_search(host, page)
+        d = gh_search_retrying(host, page)
         if d is None:
             complete = False
             break
@@ -122,15 +143,42 @@ def slugs_from_file(path):
 
 
 def board_is_live(url):
-    """A slug only counts if its board API actually answers with postings."""
+    """A slug only counts if its board API actually answers with postings.
+
+    True: live. False: the board answered and is gone or empty. None: no
+    answer (timeout, network), which says nothing about the board, so it is
+    not remembered as dead.
+    """
     try:
         with urllib.request.urlopen(
                 urllib.request.Request(url, headers=UA), timeout=20) as r:
             d = json.load(r)
-    except Exception:
+    except urllib.error.HTTPError as e:
+        return False if e.code in (404, 410) else None
+    except json.JSONDecodeError:
         return False
+    except Exception:
+        return None
     jobs = d if isinstance(d, list) else (d.get("jobs") or [])
     return bool(jobs)
+
+
+def load_dead():
+    try:
+        return json.loads(DEAD.read_text())
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def recently_dead(dead, key, today):
+    when = dead.get(key)
+    if not when:
+        return False
+    try:
+        age = (today - datetime.date.fromisoformat(when)).days
+    except ValueError:
+        return False
+    return age < DEAD_DAYS
 
 
 def main():
@@ -156,6 +204,9 @@ def main():
 
     added = []
     search_ok = True
+    today = datetime.date.today()
+    dead = load_dead()
+    skipped_dead = 0
     for src, (host, slug_rx, api) in BOARDS.items():
         found, complete = (set(), True) if args.no_github else harvest(host, slug_rx)
         search_ok &= complete
@@ -163,12 +214,23 @@ def main():
             print(f"searching {host} (GitHub) ...", file=sys.stderr)
         found |= from_search.get(src, set())
         new = [s for s in sorted(found) if f"{src}:{s}".lower() not in known]
-        print(f"  {len(found)} slugs, {len(new)} not in companies.txt",
-              file=sys.stderr)
-        for s in new:
-            if board_is_live(api.format(s)):
+        todo = [s for s in new if not recently_dead(dead, f"{src}:{s}".lower(), today)]
+        skipped_dead += len(new) - len(todo)
+        print(f"  {len(found)} slugs, {len(new)} not in companies.txt, "
+              f"{len(new) - len(todo)} dead in the last {DEAD_DAYS} days, "
+              f"checking {len(todo)}", file=sys.stderr)
+        with ThreadPoolExecutor(LIVE_CHECK_WORKERS) as pool:
+            live = list(pool.map(lambda s: board_is_live(api.format(s)), todo))
+        for s, ok in zip(todo, live):
+            key = f"{src}:{s}".lower()
+            if ok:
                 added.append(f"{src}:{s}")
+                dead.pop(key, None)
                 print(f"  + {src}:{s}", file=sys.stderr)
+            elif ok is False:
+                dead[key] = str(today)
+
+    storage.write_json(DEAD, dead, indent=1)
 
     if not added:
         print("No new live boards.")

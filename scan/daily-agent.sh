@@ -64,7 +64,12 @@ ALLOWED_TOOLS=(
   "Edit(/$HARVEST)"
 )
 
-if [ -z "$CLAUDE_BIN" ]; then
+GOOGLE_ON=$("$PY" -c "import sys; sys.path.insert(0, '$SCAN_DIR'); import config; print(int(bool(config.GOOGLE_ENABLED)))") || GOOGLE_ON=1
+
+if [ "$GOOGLE_ON" = "0" ]; then
+  echo "Google step is off (GOOGLE_ENABLED = False in me/search.py), skipping it"
+  STATUS=0
+elif [ -z "$CLAUDE_BIN" ]; then
   echo "claude not found on PATH, skipping the Google step" >&2
   STATUS=1
 else

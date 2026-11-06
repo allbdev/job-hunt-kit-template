@@ -38,11 +38,24 @@ ROLE_NOUN = S.ROLE_NOUN
 TARGET_LABEL = S.TARGET_LABEL
 HOME_LABEL = S.HOME_LABEL
 GOOGLE_QUERIES = S.GOOGLE_QUERIES
+# False turns off the Google step: the daily run skips it, and the report
+# and notifications stop tracking it.
+GOOGLE_ENABLED = getattr(S, "GOOGLE_ENABLED", True)
+# True: "Remote (United States)" and the like go to Wrong country instead of
+# Worth a glance.
+SCOPED_REMOTE_IS_WRONG_COUNTRY = getattr(S, "SCOPED_REMOTE_IS_WRONG_COUNTRY", False)
 
 TARGET_TITLE = re.compile(S.TARGET_TITLE, re.I)
 ROLE_GATE = re.compile(S.ROLE_GATE, re.I)
 EXCLUDE_TITLES = re.compile(S.EXCLUDE_TITLES, re.I)
 LOWER_LEVEL = re.compile(S.LOWER_LEVEL, re.I)
+# Optional: a different target level per kind of role (see TRACKS in
+# templates/me/search.py). Empty means TARGET_TITLE alone decides the level.
+LEVELS = {k: re.compile(v, re.I) for k, v in getattr(S, "LEVELS", {}).items()}
+TRACKS = [dict(t, title=re.compile(t["title"], re.I),
+               body=re.compile(t["body"], re.I) if t.get("body") else None)
+          for t in getattr(S, "TRACKS", [])]
+GENERIC_LEVELS = getattr(S, "GENERIC_LEVELS", {})
 # Places you can work from, plus the words that mean "anywhere".
 ANYWHERE = (r"worldwide|global|globally|anywhere|any country|any location|"
             r"international|multiple countries")

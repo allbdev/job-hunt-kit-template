@@ -62,7 +62,10 @@ def health(today):
     items, worst = [], "ok"
     rank = {"ok": 0, "warn": 1, "bad": 2}
 
-    for kind, label in (("boards", "Direct board scan"), ("google", "Google scan")):
+    sources = [("boards", "Direct board scan")]
+    if config.GOOGLE_ENABLED:
+        sources.append(("google", "Google scan"))
+    for kind, label in sources:
         ok_run = runlog.last(kind, ok_only=True, completed_only=True)
         any_run = runlog.last(kind, ok_only=False, completed_only=True)
         age = runlog.age_days(ok_run.get("when"), today)
@@ -117,7 +120,7 @@ def health_html(today):
         f'<span class="hwhen">{html.escape(i["when"])}</span>'
         f'<span class="hnote">{html.escape(i["note"] or i["stamp"] or "")}</span></div>'
         for i in items)
-    words = {"ok": "Both scans are current",
+    words = {"ok": "Both scans are current" if config.GOOGLE_ENABLED else "The board scan is current",
              "warn": "One scan is falling behind",
              "bad": "This page is not backed by a fresh search"}
     return (f'<section class="health {worst}">'
@@ -568,7 +571,8 @@ def render(rows, today, sections=None, aside=True):
                      f' data-pay="{1 if r.get("pay") else 0}"'
                      f' data-home="{1 if (r.get("home") or rank.HOME.search(r.get("loc") or "")) else 0}"'
                      f' data-src="{"both" if len(r["sources"]) == 2 else next(iter(r["sources"]))}"'
-                     f' data-mark="{r.get("mark") or "none"}"')
+                     f' data-mark="{r.get("mark") or "none"}"'
+                     f' data-fresh="{1 if fresh else 0}"')
             search = html.escape(" ".join([
                 r["company"], r["title"], " ".join(r["hard"] + r["soft"]),
                 r.get("pay") or "", r.get("posted") or "",
@@ -658,6 +662,7 @@ function passes(row,q){
   // Several day chips read as "or", so the widest one wins.
   if(a<0||a>Math.max(...ages)) return false;
  }
+ if(chips.some(b=>b.dataset.chip==='fresh'&&chipOn(b))&&row.dataset.fresh!=='1') return false;
  if(chips.some(b=>b.dataset.chip==='home'&&chipOn(b))&&row.dataset.home!=='1') return false;
  if(chips.some(b=>b.dataset.chip==='pay'&&chipOn(b))&&row.dataset.pay!=='1') return false;
  const marks=chips.filter(b=>b.dataset.chip==='mark'&&chipOn(b)).map(b=>b.dataset.val);
@@ -835,6 +840,7 @@ if(live){
             f'<button onclick="document.querySelectorAll(\'details\').forEach(d=>d.open=true)">expand all</button>'
             f'<button onclick="document.querySelectorAll(\'details\').forEach(d=>d.open=false)">collapse all</button></nav>'
             f'<nav class="chips">'
+            f'<button data-chip="fresh">new today</button>'
             f'<button data-chip="age" data-max="7">posted 7 days</button>'
             f'<button data-chip="age" data-max="14">14 days</button>'
             f'<button data-chip="age" data-max="30">30 days</button>'

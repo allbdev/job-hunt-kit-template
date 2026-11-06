@@ -36,7 +36,17 @@ TITLE_JUNK = re.compile(
 # One bucket for all soft reasons buried the real rows under wrong-role rows.
 NOT_QA_REASON = f"not a {config.ROLE_NOUN} at all"
 LEVEL_REASON = f"title is not a {config.TARGET_LABEL}"
+# Stored rows keep the wording they were judged with, so match the start:
+# changing TARGET_LABEL must not move old rows out of "One level down".
+LEVEL_PREFIX = "title is not a "
+
+
+def is_level_reason(reason):
+    return reason == LEVEL_REASON or reason.startswith(LEVEL_PREFIX)
 WRONG_ROLE_REASON = "title may not be a software role"
+# A level the track does not target, but close enough to read. Starts with
+# "level:" so rank.py can tell it from a logistics doubt.
+ABOVE_PREFIX = "level:"
 
 
 def title_bucket(soft):
@@ -48,9 +58,64 @@ def title_bucket(soft):
         return "notqa"
     if WRONG_ROLE_REASON in soft:
         return "role"
-    if LEVEL_REASON in soft:
+    if any(is_level_reason(r) for r in soft):
         return "level"
     return ""
+
+# ------------------------------------------------------------------- level
+def level_of(title):
+    """The first LEVELS name the title matches, or "none" for no level."""
+    for name, rx in config.LEVELS.items():
+        if rx.search(title):
+            return name
+    return "none"
+
+
+def track_of(title, body=""):
+    """(track name, how it was decided) for one posting.
+
+    The title decides when it names the kind of role. A generic title
+    ("Senior Software Engineer") is decided by the ad text: the track whose
+    words the ad uses most, if it clearly leads. Otherwise None.
+    """
+    for t in config.TRACKS:
+        if t["title"].search(title):
+            return t["name"], "title"
+    hits = []
+    for t in config.TRACKS:
+        if t["body"] is not None:
+            words = {m.group(0).lower() for m in t["body"].finditer(body)}
+            hits.append((len(words), t["name"]))
+    hits.sort(reverse=True)
+    if hits and hits[0][0] >= 3 and (len(hits) == 1 or
+                                     hits[0][0] >= 1.5 * hits[1][0]):
+        return hits[0][1], "ad text"
+    return None, "unclear"
+
+
+def level_reasons(title, body=""):
+    """Soft reasons about the level of one posting. [] means right level.
+
+    With no TRACKS this is the old single rule: TARGET_TITLE or a level down.
+    """
+    if not config.TRACKS:
+        return [] if TITLE_OK.search(title) else [LEVEL_REASON]
+    name, how = track_of(title, body)
+    level = level_of(title)
+    if name is None:
+        verdict = config.GENERIC_LEVELS.get(level, "down")
+    else:
+        verdict = next(t for t in config.TRACKS
+                       if t["name"] == name)["levels"].get(level, "down")
+    if verdict == "ok":
+        return []
+    if verdict == "glance":
+        if name is None:
+            return [f"{ABOVE_PREFIX} generic {level} title, check the stack"]
+        via = "" if how == "title" else f" (from the {how})"
+        return [f"{ABOVE_PREFIX} {level} {name}{via}, not your target level for it"]
+    return [LEVEL_REASON]
+
 
 # ---------------------------------------------------------------- geography
 # Allowlist, not a blocklist. A posting must name a place you can work from.
@@ -115,7 +180,7 @@ COUNTRIES = (
     r"england|scotland|wales|ireland|france|germany|deutschland|spain|portugal|"
     r"italy|netherlands|holland|belgium|luxembourg|switzerland|austria|poland|"
     r"czechia|czech republic|slovakia|hungary|romania|bulgaria|greece|turkey|"
-    r"ukraine|serbia|croatia|denmark|sweden|norway|finland|iceland|estonia|"
+    r"ukraine|serbia|croatia|t\u00fcrkiye|turkiye|denmark|sweden|norway|finland|iceland|estonia|"
     r"latvia|lithuania|india|pakistan|bangladesh|sri lanka|china|hong kong|"
     r"taiwan|japan|tokyo|korea|singapore|malaysia|indonesia|thailand|vietnam|"
     r"philippines|australia|new zealand|israel|uae|emirates|saudi arabia|qatar|"
@@ -169,6 +234,20 @@ REMOTE_LOC = re.compile(
     r"international|multiple countries)\b", re.I)
 
 
+def _scoped(where, hard, soft):
+    """A remote role whose hiring is limited to places you cannot work from.
+
+    By default a doubt (Worth a glance): some of these hire contractors
+    elsewhere anyway. SCOPED_REMOTE_IS_WRONG_COUNTRY makes it Wrong country.
+    """
+    reason = f"remote, but hiring is scoped to {where}"[:90]
+    if config.SCOPED_REMOTE_IS_WRONG_COUNTRY:
+        hard.append(f"location: {reason}"[:100])
+    else:
+        soft.append(reason)
+    return hard, soft
+
+
 def geo_verdict(loc, country, body, title="", remote=False):
     """Return (hard, soft) reasons for the geography of one posting.
 
@@ -197,19 +276,23 @@ def geo_verdict(loc, country, body, title="", remote=False):
     if says_anywhere(body) and not names_a_place:
         return hard, soft
 
+    # "Anywhere in France, Belgium, Spain" names its places. The word
+    # "anywhere" only clears a location that does not scope it elsewhere.
+    scoped = re.search(r"\banywhere\s+in\s+(.+)", loc, re.I)
+    if scoped and not config.HOME.search(scoped.group(1)):
+        return _scoped(scoped.group(1).strip(), hard, soft)
+
     if loc and not GEO_OK.search(loc) and not BARE_REMOTE.match(loc):
         m = REMOTE_SCOPED.match(loc)
         if m:
             where = (m.group(1) or m.group(2) or "").strip()
-            soft.append(f"remote, but hiring is scoped to {where}"[:90])
-            return hard, soft
+            return _scoped(where, hard, soft)
         # A remote role whose location names only a country is scoped by
         # policy. A named city or state is an address, and stays hard even
         # when the posting calls itself remote.
         if remote and COUNTRY_RX.search(loc) and not (
                 PLACE_RX.search(loc) or CODE_RX.search(loc)):
-            soft.append(f"remote, but hiring is scoped to {loc}"[:90])
-            return hard, soft
+            return _scoped(loc, hard, soft)
         return [f"location: {loc}"], soft
 
     for m in BASED_IN.finditer(body or ""):
