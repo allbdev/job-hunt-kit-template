@@ -10,11 +10,19 @@ for f in $(cd templates/me && find . -type f); do
 done
 
 mkdir -p ~/.claude/skills
-if [ -L ~/.claude/skills/job-fit ] || [ ! -e ~/.claude/skills/job-fit ]; then
-  ln -sfn "$KIT/skills/job-fit" ~/.claude/skills/job-fit
-  echo "linked ~/.claude/skills/job-fit"
-else
-  echo "~/.claude/skills/job-fit exists and is not a link. Left it alone."
+for dir in "$KIT"/skills/*/; do
+  name="$(basename "$dir")"
+  if [ -L ~/.claude/skills/"$name" ] || [ ! -e ~/.claude/skills/"$name" ]; then
+    ln -sfn "$KIT/skills/$name" ~/.claude/skills/"$name"
+    echo "linked ~/.claude/skills/$name"
+  else
+    echo "~/.claude/skills/$name exists and is not a link. Left it alone."
+  fi
+done
+
+# Block pushes that carry private data (see skills/safe-push).
+if [ -d .git ]; then
+  git config core.hooksPath .githooks && echo "enabled the pre-push privacy check"
 fi
 
 # A private Python for the CV builder. Homebrew Python refuses a global pip install.

@@ -11,7 +11,8 @@ not proceed past the interview until every question below is answered or explici
 ## 1. Install
 
 - Run `./setup.sh`. It copies `templates/me/` to `me/`, makes `me/.venv` with reportlab, and
-  links the skill into `~/.claude/skills/job-fit`.
+  links the skills (`job-fit`, `safe-push`) into `~/.claude/skills/`, and turns on the pre-push
+  check that blocks private data from leaving the machine.
 - Fix anything it prints as MISSING. Ask before installing software.
 
 ## 2. The interview

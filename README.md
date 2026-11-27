@@ -58,6 +58,7 @@ Nothing is filled in. Claude interviews you: your role, your location and work r
 | Folder | Holds | Shared |
 |---|---|---|
 | `skills/job-fit/` | the skill | yes |
+| `skills/safe-push/` | the check that runs before every push | yes |
 | `cv/` | CV and letter builder | yes |
 | `scan/` | daily scanner | yes |
 | `templates/me/` | the blank starting profile | yes |
