@@ -10,6 +10,7 @@ step no Python sees, the browser harvest:
 
   python3 runlog.py google --blocked          Google served /sorry/
   python3 runlog.py google --ok --found 140   the harvest finished
+  python3 runlog.py google --signed-in        Chrome was signed in, scan refused
   python3 runlog.py google --failed           it broke for another reason
   python3 runlog.py show                      the last run of each kind
 """
@@ -103,6 +104,8 @@ def main():
     args = sys.argv[2:]
     ok = "--ok" in args
     why = ("google served /sorry/, unusual traffic" if "--blocked" in args
+           else "chrome profile is signed in to Google, scan refused"
+           if "--signed-in" in args
            else "" if ok else "the step did not finish")
     counts = {}
     if "--found" in args:

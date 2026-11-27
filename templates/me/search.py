@@ -36,6 +36,23 @@ ROLE_GATE = r""
 # this one goes to "One level down".
 TARGET_TITLE = r""
 
+# Optional: a different target level per kind of role, e.g. Senior for
+# frontend but Mid for backend. Leave TRACKS empty and TARGET_TITLE alone
+# decides the level. When set, TRACKS decides it instead.
+#   LEVELS: name -> regex, checked in order; no match means level "none".
+#   TRACKS: checked in order, first title match wins. "body" words decide a
+#     generic title ("Software Engineer") when one track clearly leads.
+#     "levels" maps each level to ok (Clean), glance (Worth a glance) or
+#     down (One level down).
+#   GENERIC_LEVELS: the same map, for a generic title whose ad is unclear.
+# Example:
+#   LEVELS = {"lower": r"\bjunior\b", "senior": r"\bsenior\b", "mid": r"\bmid\b"}
+#   TRACKS = [{"name": "frontend", "title": r"front[- ]?end", "body": r"\breact\b|\bcss\b",
+#              "levels": {"senior": "ok", "none": "ok", "mid": "down"}}]
+LEVELS = {}
+TRACKS = []
+GENERIC_LEVELS = {}
+
 # Titles that match the gate words but are the wrong kind of work: adjacent
 # roles that share your keywords but are not your job.
 EXCLUDE_TITLES = r""
@@ -47,8 +64,17 @@ LOWER_LEVEL = r"\bjunior\b|\bjr\.?\b|mid[- ]level|intermediate|graduate|trainee"
 # "remote" with no country, or say "anywhere / worldwide".
 HOME_PLACES = r""
 
+# A remote role limited to a country you cannot work from ("Remote (United
+# States)", "Anywhere in France"). False: Worth a glance, since some of these
+# hire contractors elsewhere anyway. True: Wrong country.
+SCOPED_REMOTE_IS_WRONG_COUNTRY = False
+
 # ISO country codes the boards may return, that you can work in.
 HOME_COUNTRY_CODES = []
+
+# False skips the Google step in the daily run. It needs Claude in Chrome
+# (see scan/README.md). Turn it on only once a test run works.
+GOOGLE_ENABLED = True
 
 # Google queries the daily agent runs. Each one is combined with the
 # site: filter for Lever, Greenhouse and Ashby (see scan/harvest-google.js).

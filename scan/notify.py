@@ -42,8 +42,10 @@ def remember(urls):
 def failures():
     """Which sources did not complete, in words."""
     out = []
-    for kind, label in (("discovery", "board discovery"),
-                        ("boards", "board scan"), ("google", "Google scan")):
+    kinds = [("discovery", "board discovery"), ("boards", "board scan")]
+    if config.GOOGLE_ENABLED:
+        kinds.append(("google", "Google scan"))
+    for kind, label in kinds:
         ok = runlog.last(kind, ok_only=True, completed_only=True)
         any_run = runlog.last(kind, ok_only=False, completed_only=True)
         if any_run and not any_run.get("ok") and (

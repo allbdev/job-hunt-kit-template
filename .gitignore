@@ -1,5 +1,19 @@
 # Personal data: CVs, history, scan state. Never commit.
 /me/
+/linkedin/
+
+# Documents, exports and credentials belong in me/, never in git.
+*.pdf
+*.doc
+*.docx
+*.xls
+*.xlsx
+*.zip
+*.har
+*.pem
+*.key
+.env
+.env.*
 
 __pycache__/
 *.pyc

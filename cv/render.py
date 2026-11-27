@@ -37,6 +37,7 @@ def render(d):
     story += cv.sec("EXPERIENCE")
     for i, job in enumerate(bullets):
         story += cv.job(i, job)
+    story += cv.projects(getattr(d, "PROJECTS", None))
     story += cv.speaking()
     story += cv.education()
     cv.build(d.OUT, d.TITLE, story)

@@ -18,7 +18,7 @@ A launchd agent keeps it running, so editing this file changes nothing until:
 
   launchctl kickstart -k gui/$(id -u)/com.$(whoami).job-scan-server
 """
-import argparse, datetime, json, pathlib, threading, webbrowser
+import argparse, datetime, json, pathlib, subprocess, sys, threading, webbrowser
 
 import config
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -57,7 +57,16 @@ def build_if_stale(which=None):
         stale = [f for f in (PAGE, ASIDE)
                  if not f.exists() or int(f.stat().st_mtime) < newest]
         if stale:
-            report.main()
+            # A fresh process, not report.main(): this server runs for days,
+            # and the modules it imported at start are the old code. A rules
+            # or report change triggered a rebuild with the very code it
+            # replaced, and silently undid it.
+            r = subprocess.run([sys.executable, str(CODE / "report.py")],
+                               cwd=CODE, capture_output=True, text=True,
+                               timeout=300)
+            if r.returncode:
+                print(f"  ! report.py failed: {r.stderr.strip()[-300:]}",
+                      flush=True)
         return which.read_bytes()
 
 

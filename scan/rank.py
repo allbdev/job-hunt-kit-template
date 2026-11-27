@@ -64,12 +64,15 @@ def score(row, today=None):
         points += 10
         why.append("remote, no country named")
 
-    title = row.get("title") or ""
-    if rules.TITLE_OK.search(title):
-        points += 20
-        why.append("staff-level title")
-    elif rules.LEVEL_REASON in (row.get("soft") or []):
+    soft = row.get("soft") or []
+    if any(rules.is_level_reason(r) for r in soft):
         why.append("a level down")
+    elif any(r.startswith(rules.ABOVE_PREFIX) for r in soft):
+        points += 8
+        why.append("level worth a look")
+    else:
+        points += 20
+        why.append("target-level title")
 
     if row.get("pay"):
         points += 7

@@ -1,0 +1,13 @@
+#!/bin/bash
+# Backstop for the safe-push skill: block a push that carries private data.
+# Enabled by setup.sh (git config core.hooksPath .githooks).
+root="$(git rev-parse --show-toplevel)"
+remote="$1"
+zero="0000000000000000000000000000000000000000"
+status=0
+while read -r _ local_sha _ _; do
+  [ "$local_sha" = "$zero" ] && continue   # deleting a remote branch
+  python3 "$root/skills/safe-push/check.py" "$local_sha" --not --remotes="$remote" || status=1
+done
+[ $status -ne 0 ] && echo "Push blocked. Fix the problems above (see skills/safe-push/SKILL.md)."
+exit $status

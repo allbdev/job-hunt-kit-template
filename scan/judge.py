@@ -70,8 +70,7 @@ def judge(job):
         soft.append(rules.NOT_QA_REASON)
     if rules.TITLE_WEAK.search(t):
         soft.append(rules.WRONG_ROLE_REASON)
-    if not rules.TITLE_OK.search(t):
-        soft.append(rules.LEVEL_REASON)
+    soft += rules.level_reasons(t, body)
 
     return bucket_for(hard, soft), hard, soft
 
